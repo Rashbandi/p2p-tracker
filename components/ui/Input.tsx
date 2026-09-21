@@ -40,8 +40,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 ? 'border-green-500'
                 : 'border-gray-600',
               'px-3 py-2',
-              icon && 'pl-9',
-              rightIcon && 'pr-9',
+              icon ? 'pl-9' : '',
+              rightIcon ? 'pr-9' : '',
               className
             )}
             style={style}
