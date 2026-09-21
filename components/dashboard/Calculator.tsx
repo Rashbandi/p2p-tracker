@@ -8,12 +8,17 @@ import { NumInput } from '@/components/ui/Input'
 // Target profit levels to suggest
 const TARGET_PCTS = [1, 2, 3, 4, 5]
 
-// Given buy price + vesComm, what sell price achieves X% profit after maker fee?
+// Dado precio de compra + comisiones, ¿a qué precio de venta se logra X% de ganancia?
+// Anunciante = maker en ambos lados → fee 0.30% en compra Y en venta
 function suggestSellPrice(buyPrice: number, vesComm: number, targetPct: number, exchange: 'binance' | 'bybit'): number {
   const makerFee = exchange === 'binance' ? BINANCE_MAKER_FEE : 0
-  const costPerUSDT = buyPrice * (1 + vesComm)
-  const neededRevenue = costPerUSDT * (1 + targetPct / 100)
-  return makerFee < 1 ? neededRevenue / (1 - makerFee) : neededRevenue
+  // Costo real por USDT neto (ya descontada fee de compra y comisión de método de pago)
+  const usdtNetPerFiat = (1 - makerFee) / buyPrice   // USDT neto que obtienes por cada VES
+  const effectiveBuyCost = (1 + vesComm) / usdtNetPerFiat  // fiat real por USDT neto
+  // El sell neto (después de fee de venta) debe cubrir costo + ganancia
+  const neededNetRevenue = effectiveBuyCost * (1 + targetPct / 100)
+  // Precio de venta bruto para que, tras quitar 0.30%, quede neededNetRevenue
+  return makerFee < 1 ? neededNetRevenue / (1 - makerFee) : neededNetRevenue
 }
 
 export function Calculator() {
@@ -37,9 +42,10 @@ export function Calculator() {
   // Profit target suggestions — only need buy price
   const showTargets = buyP > 0
 
-  // If user entered a sell price, compute which target % it hits
+  // Ganancia real considerando maker fee en ambos lados (anunciante)
+  // (sellPrice × (1−fee)) / (buyPrice / (1−fee) × (1+vesComm)) − 1
   const actualSellPct = buyP > 0 && selP > 0
-    ? ((selP * (1 - makerFee)) / (buyP * (1 + vesComm)) - 1) * 100
+    ? ((selP * (1 - makerFee) * (1 - makerFee)) / (buyP * (1 + vesComm)) - 1) * 100
     : null
 
   return (
@@ -117,7 +123,7 @@ export function Calculator() {
         <div className="mb-4 border border-gray-700 rounded-xl overflow-hidden">
           <div className="px-4 py-2.5 bg-gray-800/60 border-b border-gray-700 flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-300">Precios de venta sugeridos</span>
-            <span className="text-[10px] text-gray-600">Compraste a {fmtVES(buyP)} · comis. {(makerFee * 100).toFixed(2)}%</span>
+            <span className="text-[10px] text-gray-600">Anunciante · maker {(makerFee * 100).toFixed(2)}% compra + {(makerFee * 100).toFixed(2)}% venta</span>
           </div>
 
           <div className="divide-y divide-gray-800/60">
@@ -204,15 +210,15 @@ export function Calculator() {
           {/* Detail rows */}
           <div className="divide-y divide-gray-800">
             {[
-              { label: 'Capital invertido',                         val: fmtVES(result.capital),             color: 'text-gray-300' },
-              { label: 'Comisión método de pago',                   val: `+${fmtVES(result.comisFiatCompra)}`, color: 'text-amber-400' },
-              { label: 'Total fiat entregado',                      val: fmtVES(result.totalFiatSale),        color: 'text-white',   bold: true },
-              { label: 'USDT bruto comprado',                       val: `${fmtUSDT(result.usdtBruto)} USDT`, color: 'text-blue-400' },
-              { label: `Comis. publicar anuncio (${(makerFee*100).toFixed(2)}%)`, val: `-${fmtUSDT(result.comisUsdtCompra)} USDT`, color: 'text-red-400' },
-              { label: 'USDT neto disponible',                      val: `${fmtUSDT(result.usdtNeto)} USDT`, color: 'text-blue-300', bold: true },
-              { label: `Comis. cerrar venta (${(makerFee*100).toFixed(2)}%)`,    val: `-${fmtUSDT(result.comisUsdtVenta)} USDT`, color: 'text-red-400' },
-              { label: 'USDT vendidos',                             val: `${fmtUSDT(result.usdtNetVenta)} USDT`, color: 'text-gray-300' },
-              { label: 'Fiat recibido',                             val: fmtVES(result.fiatRecibido),         color: 'text-green-400', bold: true },
+              { label: 'Capital invertido',                                    val: fmtVES(result.capital),               color: 'text-gray-300' },
+              { label: 'Comisión método de pago',                          val: result.comisFiatCompra > 0 ? `+${fmtVES(result.comisFiatCompra)}` : '0,00', color: 'text-amber-400' },
+              { label: 'Total fiat entregado',                             val: fmtVES(result.totalFiatSale),          color: 'text-white',   bold: true },
+              { label: 'USDT bruto recibido',                              val: `${fmtUSDT(result.usdtBruto)} USDT`,  color: 'text-blue-400' },
+              { label: `Comis. anuncio COMPRA (maker ${(makerFee*100).toFixed(2)}%)`, val: `-${fmtUSDT(result.comisUsdtCompra)} USDT`, color: 'text-red-400' },
+              { label: 'USDT neto disponible',                             val: `${fmtUSDT(result.usdtNeto)} USDT`,   color: 'text-blue-300', bold: true },
+              { label: `Comis. anuncio VENTA (maker ${(makerFee*100).toFixed(2)}%)`, val: `-${fmtUSDT(result.comisUsdtVenta)} USDT`, color: 'text-red-400' },
+              { label: 'USDT vendidos neto',                               val: `${fmtUSDT(result.usdtNetVenta)} USDT`, color: 'text-gray-300' },
+              { label: 'Fiat recibido',                                    val: fmtVES(result.fiatRecibido),           color: 'text-green-400', bold: true },
             ].map((row, i) => (
               <div key={i} className="flex items-center justify-between px-4 py-2">
                 <span className="text-xs text-gray-500">{row.label}</span>
