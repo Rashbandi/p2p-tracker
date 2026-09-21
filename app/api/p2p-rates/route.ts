@@ -2,29 +2,38 @@ import { NextRequest, NextResponse } from 'next/server'
 import type { Fiat, P2PRate, P2PRates } from '@/types'
 
 const BINANCE_URL = 'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search'
-const TOP_N = 10
+const TOP_N = 20
 
 interface BinanceAdv {
   adv: {
     price: string
     minSingleTransAmount: string
     dynamicMaxSingleTransAmount: string
-    tradeMethods: { tradeMethodName: string }[]
+    tradeMethods: { tradeMethodName: string; identifier: string }[]
   }
   advertiser: {
     nickName: string
   }
 }
 
-async function fetchBinanceRates(fiat: string, tradeType: 'BUY' | 'SELL'): Promise<P2PRate[]> {
-  const body = {
+async function fetchBinanceRates(
+  fiat: string,
+  tradeType: 'BUY' | 'SELL',
+  payTypes: string[],
+  transAmount: number | null,
+): Promise<P2PRate[]> {
+  const body: Record<string, unknown> = {
     fiat,
     asset: 'USDT',
     tradeType,
     page: 1,
     rows: TOP_N,
     publisherType: null,
-    payTypes: [],
+    payTypes: payTypes.length > 0 ? payTypes : [],
+  }
+
+  if (transAmount && transAmount > 0) {
+    body.transAmount = transAmount
   }
 
   const res = await fetch(BINANCE_URL, {
@@ -34,12 +43,10 @@ async function fetchBinanceRates(fiat: string, tradeType: 'BUY' | 'SELL'): Promi
       'User-Agent': 'Mozilla/5.0',
     },
     body: JSON.stringify(body),
-    next: { revalidate: 60 },
+    cache: 'no-store',
   })
 
-  if (!res.ok) {
-    throw new Error(`Binance P2P API error: ${res.status}`)
-  }
+  if (!res.ok) throw new Error(`Binance P2P API error: ${res.status}`)
 
   const data = await res.json()
   const items: BinanceAdv[] = data?.data ?? []
@@ -61,11 +68,16 @@ function avg(rates: P2PRate[]): number {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const fiat = (searchParams.get('fiat') ?? 'VES').toUpperCase() as Fiat
+  const payTypesRaw = searchParams.get('payTypes') ?? ''
+  const transAmountRaw = searchParams.get('transAmount') ?? ''
+
+  const payTypes = payTypesRaw ? payTypesRaw.split(',').filter(Boolean) : []
+  const transAmount = transAmountRaw ? parseFloat(transAmountRaw) : null
 
   try {
     const [buyRates, sellRates] = await Promise.all([
-      fetchBinanceRates(fiat, 'BUY'),
-      fetchBinanceRates(fiat, 'SELL'),
+      fetchBinanceRates(fiat, 'BUY', payTypes, transAmount),
+      fetchBinanceRates(fiat, 'SELL', payTypes, transAmount),
     ])
 
     const avgBuy = avg(buyRates)
@@ -85,9 +97,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json(result, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30',
-      },
+      headers: { 'Cache-Control': 'no-store' },
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
