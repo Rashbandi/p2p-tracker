@@ -8,6 +8,7 @@ import { DonutChart } from '@/components/dashboard/DonutChart'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { fmtVES, fmtUSDT } from '@/lib/utils'
+import { RatesProvider } from '@/context/RatesContext'
 import type { P2PCycle } from '@/types'
 
 const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const maskVal = (v: string) => hideSaldos ? '••••••' : v
 
   return (
+    <RatesProvider>
     <div className="fade-in">
       {/* Welcome */}
       <div className="flex items-center justify-between mb-6">
@@ -194,5 +196,6 @@ export default function DashboardPage() {
         </Card>
       </div>
     </div>
+    </RatesProvider>
   )
 }
