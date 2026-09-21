@@ -1,13 +1,12 @@
 'use client'
 import { useState } from 'react'
-import { useP2PRates, RatesFilter } from '@/hooks/useP2PRates'
+import { useRates } from '@/context/RatesContext'
+import type { RatesFilter } from '@/hooks/useP2PRates'
 import { fmtVES } from '@/lib/utils'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { BankDropdown } from '@/components/ui/BankDropdown'
 import { VES_BANKS, EXTRA_PAY_METHODS } from '@/lib/ves-banks'
 import type { Fiat } from '@/types'
-
-const FIATS: Fiat[] = ['VES', 'COP', 'ARS', 'BRL']
 
 const FLAG: Record<string, string> = {
   VES: '🇻🇪', COP: '🇨🇴', ARS: '🇦🇷', BRL: '🇧🇷', PEN: '🇵🇪', CLP: '🇨🇱',
@@ -20,17 +19,18 @@ const ALL_PAY_LABELS: Record<string, string> = {
 }
 
 export function RatesPanel() {
-  const [activeFiat, setActiveFiat] = useState<Fiat>('VES')
-  const [showFilters, setShowFilters] = useState(false)
+  const {
+    rates, loading, error, lastUpdate, refresh,
+    activeFiat, setActiveFiat,
+    appliedFilters, setAppliedFilters,
+    fiats,
+  } = useRates()
 
-  // Filter state
+  const [showFilters, setShowFilters] = useState(false)
   const [selectedPay, setSelectedPay] = useState<string[]>([])
   const [transAmount, setTransAmount] = useState('')
-  const [appliedFilters, setAppliedFilters] = useState<RatesFilter>({ payTypes: [], transAmount: '' })
 
-  const { rates, loading, error, lastUpdate, refresh } = useP2PRates(FIATS, appliedFilters)
   const rate = rates[activeFiat]
-
   const hasFilters = appliedFilters.payTypes.length > 0 || !!appliedFilters.transAmount
 
   function applyFilters() {
@@ -93,7 +93,6 @@ export function RatesPanel() {
       {/* Filter panel */}
       {showFilters && (
         <div className="mb-4 p-4 bg-gray-800/60 border border-gray-700 rounded-xl">
-          {/* Amount in active fiat */}
           <div className="mb-4">
             <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-2">
               Monto en {activeFiat} a operar
@@ -118,7 +117,6 @@ export function RatesPanel() {
             </p>
           </div>
 
-          {/* Bank / payment method picker — only for VES */}
           {activeFiat === 'VES' && (
             <div className="mb-4">
               <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-2">
@@ -128,7 +126,6 @@ export function RatesPanel() {
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex gap-2 mt-1">
             <button
               onClick={applyFilters}
@@ -169,7 +166,7 @@ export function RatesPanel() {
 
       {/* Fiat tabs */}
       <div className="flex gap-1.5 mb-4">
-        {FIATS.map(fiat => (
+        {fiats.map(fiat => (
           <button
             key={fiat}
             onClick={() => setActiveFiat(fiat)}
