@@ -8,16 +8,11 @@ interface BinanceAdv {
   adv: {
     price: string
     minSingleTransAmount: string
-    maxSingleTransAmount: string
+    dynamicMaxSingleTransAmount: string
+    tradeMethods: { tradeMethodName: string }[]
   }
   advertiser: {
     nickName: string
-  }
-  adv: {
-    price: string
-    minSingleTransAmount: string
-    dynamicMaxSingleTransAmount: string
-    tradeMethods: { tradeMethodName: string }[]
   }
 }
 
@@ -39,7 +34,7 @@ async function fetchBinanceRates(fiat: string, tradeType: 'BUY' | 'SELL'): Promi
       'User-Agent': 'Mozilla/5.0',
     },
     body: JSON.stringify(body),
-    next: { revalidate: 60 }, // cache 60s
+    next: { revalidate: 60 },
   })
 
   if (!res.ok) {
