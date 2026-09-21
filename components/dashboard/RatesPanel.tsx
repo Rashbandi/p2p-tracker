@@ -104,23 +104,23 @@ export function RatesPanel() {
       {/* Filter panel */}
       {showFilters && (
         <div className="mb-4 p-4 bg-gray-800/60 border border-gray-700 rounded-xl">
-          {/* Amount */}
+          {/* Amount in fiat */}
           <div className="mb-4">
             <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-2">
-              Monto USDT a operar
+              Monto en {activeFiat} a operar
             </label>
             <div className="relative">
               <input
                 type="number"
-                placeholder="ej: 500"
+                placeholder={activeFiat === 'VES' ? 'ej: 500000' : activeFiat === 'COP' ? 'ej: 2000000' : activeFiat === 'ARS' ? 'ej: 1000000' : 'ej: 5000'}
                 value={transAmount}
                 onChange={e => setTransAmount(e.target.value)}
                 className="w-full bg-[#07080f] border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-green-500 focus:outline-none"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">USDT</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">{activeFiat}</span>
             </div>
             <p className="text-xs text-gray-600 mt-1">
-              Muestra solo anuncios que cubren este monto
+              Muestra solo anuncios que cubren este monto en {activeFiat}
             </p>
           </div>
 
@@ -172,7 +172,7 @@ export function RatesPanel() {
         <div className="flex flex-wrap gap-1.5 mb-3">
           {appliedFilters.transAmount && (
             <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-full">
-              {appliedFilters.transAmount} USDT
+              {Number(appliedFilters.transAmount).toLocaleString()} {activeFiat}
             </span>
           )}
           {appliedFilters.payTypes.map(id => {
@@ -229,10 +229,11 @@ export function RatesPanel() {
               <p className="text-sm font-bold text-green-400 font-mono">{fmtVES(rate.avgSell)}</p>
             </div>
             <div className="bg-gray-800/50 rounded-xl p-3 text-center">
-              <p className="text-xs text-gray-500 mb-1">Spread</p>
+              <p className="text-xs text-gray-500 mb-1">Spread bruto</p>
               <p className={`text-sm font-bold font-mono ${rate.spreadPct > 1 ? 'text-amber-400' : 'text-gray-400'}`}>
                 {rate.spreadPct.toFixed(2)}%
               </p>
+              <p className="text-[10px] text-gray-600 mt-0.5">+~0.30% comisión</p>
             </div>
           </div>
 
@@ -244,7 +245,7 @@ export function RatesPanel() {
               </svg>
               ¿Cómo fijar tu precio?
             </p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-2 gap-2 text-xs mb-2">
               <div className="flex items-start gap-1.5">
                 <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
                 <span className="text-gray-400">
@@ -259,6 +260,9 @@ export function RatesPanel() {
                   {' → '}mira la columna de <span className="text-green-400 font-medium">Venta</span>
                 </span>
               </div>
+            </div>
+            <div className="border-t border-amber-500/10 pt-2 text-[10px] text-gray-600">
+              💰 Comisión Binance P2P: <span className="text-amber-500/80">Maker ~0.30%</span> · Taker 0% · El spread mostrado es bruto (sin incluir comisión)
             </div>
           </div>
 
