@@ -31,19 +31,20 @@ export function calcP2P(params: {
   exchange: 'binance' | 'bybit'
 }): CalcResult {
   const { capital, buyPrice, sellPrice, vesComm, exchange } = params
-  const usdtComm = exchange === 'binance' ? BINANCE_MAKER_FEE : BYBIT_FEE
+  // Anunciante = siempre MAKER en ambos lados (postea anuncio de compra Y de venta)
+  const makerFee = exchange === 'binance' ? BINANCE_MAKER_FEE : BYBIT_FEE
 
   // Fiat side: payment method adds fee on top
   const comisFiatCompra = capital * vesComm
   const totalFiatSale   = capital + comisFiatCompra
 
-  // USDT received on buy
+  // Compra USDT: posteas anuncio de COMPRA → maker fee 0.30%
   const usdtBruto       = capital / buyPrice
-  const comisUsdtCompra = usdtBruto * usdtComm
+  const comisUsdtCompra = usdtBruto * makerFee
   const usdtNeto        = usdtBruto - comisUsdtCompra
 
-  // USDT sold
-  const comisUsdtVenta  = usdtNeto * usdtComm
+  // Venta USDT: posteas anuncio de VENTA → maker fee 0.30%
+  const comisUsdtVenta  = usdtNeto * makerFee
   const usdtNetVenta    = usdtNeto - comisUsdtVenta
   const fiatRecibido    = usdtNetVenta * sellPrice
 
