@@ -4,6 +4,7 @@ import { calcP2P, fmtVES, fmtUSDT, fmtPct, parseVES } from '@/lib/utils'
 import { VES_PAY_METHODS, BINANCE_MAKER_FEE } from '@/lib/constants'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { NumInput } from '@/components/ui/Input'
+import { useRates } from '@/context/RatesContext'
 
 // Target profit levels to suggest
 const TARGET_PCTS = [1, 2, 3, 4, 5]
@@ -21,12 +22,25 @@ function suggestSellPrice(buyPrice: number, vesComm: number, targetPct: number, 
   return makerFee < 1 ? neededNetRevenue / (1 - makerFee) : neededNetRevenue
 }
 
+// Semáforo de oportunidad
+function getOpportunity(roi: number): { label: string; color: string; bg: string; border: string; dot: string } {
+  if (roi >= 2)   return { label: '🟢 Excelente oportunidad',  color: 'text-green-400',  bg: 'bg-green-500/10',  border: 'border-green-500/30',  dot: 'bg-green-400'  }
+  if (roi >= 0.5) return { label: '🟡 Oportunidad marginal',   color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/30',  dot: 'bg-amber-400'  }
+  if (roi > 0)    return { label: '🟠 Spread muy ajustado',    color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30', dot: 'bg-orange-400' }
+  return            { label: '🔴 No rentable',                  color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/30',    dot: 'bg-red-400'    }
+}
+
 export function Calculator() {
   const [capital, setCapital]   = useState('')
   const [buy, setBuy]           = useState('')
   const [sell, setSell]         = useState('')
   const [payIdx, setPayIdx]     = useState(0)
   const [exchange, setExchange] = useState<'binance' | 'bybit'>('binance')
+  const [loadingRates, setLoadingRates] = useState(false)
+
+  // Acceso a tasas en vivo compartidas
+  const { rates, activeFiat } = useRates()
+  const liveRate = rates[activeFiat]
 
   const vesComm = VES_PAY_METHODS[payIdx].rate
   const makerFee = exchange === 'binance' ? BINANCE_MAKER_FEE : 0
@@ -39,19 +53,53 @@ export function Calculator() {
     ? calcP2P({ capital: cap, buyPrice: buyP, sellPrice: selP, vesComm, exchange })
     : null
 
-  // Profit target suggestions — only need buy price
   const showTargets = buyP > 0
 
   // Ganancia real considerando maker fee en ambos lados (anunciante)
-  // (sellPrice × (1−fee)) / (buyPrice / (1−fee) × (1+vesComm)) − 1
   const actualSellPct = buyP > 0 && selP > 0
     ? ((selP * (1 - makerFee) * (1 - makerFee)) / (buyP * (1 + vesComm)) - 1) * 100
     : null
+
+  // Break-even: precio de venta para 0% ganancia
+  const breakEvenPrice = buyP > 0 ? suggestSellPrice(buyP, vesComm, 0, exchange) : 0
+
+  // ¿Hay tasas en vivo disponibles?
+  const hasLiveRates = !!liveRate?.buyRates?.length && !!liveRate?.sellRates?.length
+
+  // Auto-rellenar desde tasas en vivo
+  function useLiveRates() {
+    if (!liveRate) return
+    setLoadingRates(true)
+    // Para anunciante: compra mirando el mejor vendedor (sellRates[0]) → tu anuncio de compra compite ahí
+    // Vende mirando el mejor comprador (buyRates[0]) → tu anuncio de venta compite ahí
+    const suggestedBuy  = liveRate.sellRates[0]?.price  // precio al que pondrías tu anuncio de COMPRA
+    const suggestedSell = liveRate.buyRates[0]?.price   // precio al que pondrías tu anuncio de VENTA
+    if (suggestedBuy)  setBuy(String(suggestedBuy))
+    if (suggestedSell) setSell(String(suggestedSell))
+    setTimeout(() => setLoadingRates(false), 300)
+  }
+
+  const opportunity = actualSellPct !== null ? getOpportunity(actualSellPct) : null
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Calculadora P2P</CardTitle>
+        {/* Botón de tasas en vivo */}
+        {hasLiveRates && (
+          <button
+            onClick={useLiveRates}
+            disabled={loadingRates}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-500/10 border border-blue-500/25 text-blue-400 hover:bg-blue-500/20 transition-all disabled:opacity-50"
+            title={`Usar tasas actuales de ${activeFiat}`}
+          >
+            <svg className={`w-3 h-3 ${loadingRates ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Usar tasas {activeFiat}
+          </button>
+        )}
       </CardHeader>
 
       {/* Exchange selector */}
@@ -118,7 +166,51 @@ export function Calculator() {
         />
       </div>
 
-      {/* ── Profit target table ─────────────────────────────────────── */}
+      {/* ── Indicador de oportunidad de mercado ──────────────────────────── */}
+      {hasLiveRates && !buyP && (
+        <div className="mb-4 p-3 bg-gray-800/50 border border-gray-700 rounded-xl">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 font-semibold">
+            Mercado actual · {activeFiat}
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center">
+              <p className="text-[10px] text-gray-600 mb-0.5">Mejor comprador</p>
+              <p className="text-xs font-mono font-bold text-blue-400">{fmtVES(liveRate.buyRates[0]?.price ?? 0)}</p>
+              <p className="text-[10px] text-blue-500/60">tu anuncio VENTA</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-gray-600 mb-0.5">Spread bruto</p>
+              <p className={`text-xs font-mono font-bold ${liveRate.spreadPct > 0.8 ? 'text-green-400' : 'text-amber-400'}`}>
+                {liveRate.spreadPct.toFixed(2)}%
+              </p>
+              <p className="text-[10px] text-gray-600">−0.60% fees</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-gray-600 mb-0.5">Mejor vendedor</p>
+              <p className="text-xs font-mono font-bold text-green-400">{fmtVES(liveRate.sellRates[0]?.price ?? 0)}</p>
+              <p className="text-[10px] text-green-500/60">tu anuncio COMPRA</p>
+            </div>
+          </div>
+          <button
+            onClick={useLiveRates}
+            className="mt-3 w-full py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 text-xs font-semibold rounded-lg transition-colors"
+          >
+            ↓ Cargar estos precios en la calculadora
+          </button>
+        </div>
+      )}
+
+      {/* ── Semáforo de oportunidad ────────────────────────────────────── */}
+      {opportunity && (
+        <div className={`mb-4 flex items-center justify-between px-3 py-2.5 rounded-xl border ${opportunity.bg} ${opportunity.border}`}>
+          <span className={`text-xs font-semibold ${opportunity.color}`}>{opportunity.label}</span>
+          <span className={`text-sm font-bold font-mono ${opportunity.color}`}>
+            {actualSellPct! >= 0 ? '+' : ''}{actualSellPct!.toFixed(2)}% neto
+          </span>
+        </div>
+      )}
+
+      {/* ── Profit target table ─────────────────────────────────────────── */}
       {showTargets && (
         <div className="mb-4 border border-gray-700 rounded-xl overflow-hidden">
           <div className="px-4 py-2.5 bg-gray-800/60 border-b border-gray-700 flex items-center justify-between">
@@ -127,12 +219,20 @@ export function Calculator() {
           </div>
 
           <div className="divide-y divide-gray-800/60">
+            {/* Break-even row */}
+            <div className="flex items-center justify-between px-4 py-2 bg-gray-800/20">
+              <div className="flex items-center gap-2">
+                <span className="w-8 text-center text-xs font-bold font-mono rounded-md py-0.5 text-gray-600 bg-gray-700/50">0%</span>
+                <span className="text-xs text-gray-600">punto de equilibrio</span>
+              </div>
+              <span className="text-sm font-bold font-mono text-gray-500">{fmtVES(breakEvenPrice)}</span>
+            </div>
+
             {TARGET_PCTS.map(pct => {
               const target = suggestSellPrice(buyP, vesComm, pct, exchange)
-              const isActive = actualSellPct !== null &&
-                Math.abs(actualSellPct - pct) < 0.5
-              const isAbove = actualSellPct !== null && actualSellPct > pct + 0.5
-              const isBelow = actualSellPct !== null && actualSellPct < pct - 0.5
+              const isActive = actualSellPct !== null && Math.abs(actualSellPct - pct) < 0.5
+              const isAbove  = actualSellPct !== null && actualSellPct > pct + 0.5
+              const isBelow  = actualSellPct !== null && actualSellPct < pct - 0.5
 
               return (
                 <div
@@ -156,12 +256,10 @@ export function Calculator() {
                     <span className="text-xs text-gray-500">ganancia neta</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold font-mono text-white">
-                      {fmtVES(target)}
-                    </span>
+                    <span className="text-sm font-bold font-mono text-white">{fmtVES(target)}</span>
                     {actualSellPct !== null && (
                       <span className={[
-                        'text-[10px] font-medium',
+                        'text-[10px] font-medium w-16 text-right',
                         isActive ? 'text-green-400' : isAbove ? 'text-green-500/50' : 'text-red-500/50',
                       ].join(' ')}>
                         {isActive ? '✓ aquí' : isAbove ? '↑ superado' : '↓ abajo'}
@@ -177,10 +275,10 @@ export function Calculator() {
           {actualSellPct !== null && (
             <div className={[
               'px-4 py-2.5 border-t border-gray-700 flex items-center justify-between',
-              actualSellPct >= 1 ? 'bg-green-500/8' : 'bg-red-500/8',
+              actualSellPct >= 1 ? 'bg-green-500/8' : actualSellPct > 0 ? 'bg-amber-500/8' : 'bg-red-500/8',
             ].join(' ')}>
-              <span className="text-xs text-gray-400">Tu precio de venta ({fmtVES(selP)}) da:</span>
-              <span className={`text-sm font-bold font-mono ${actualSellPct >= 1 ? 'text-green-400' : 'text-red-400'}`}>
+              <span className="text-xs text-gray-400">Tu precio ({fmtVES(selP)}) da:</span>
+              <span className={`text-sm font-bold font-mono ${actualSellPct >= 1 ? 'text-green-400' : actualSellPct > 0 ? 'text-amber-400' : 'text-red-400'}`}>
                 {actualSellPct >= 0 ? '+' : ''}{actualSellPct.toFixed(2)}% real
               </span>
             </div>
@@ -188,10 +286,9 @@ export function Calculator() {
         </div>
       )}
 
-      {/* ── Full breakdown ─────────────────────────────────────────── */}
+      {/* ── Full breakdown ─────────────────────────────────────────────── */}
       {result ? (
         <div className="border border-gray-700 rounded-xl overflow-hidden">
-          {/* Header */}
           <div className={[
             'flex items-center justify-between px-4 py-3',
             result.ganancia >= 0 ? 'bg-green-500/10' : 'bg-red-500/10',
@@ -207,7 +304,6 @@ export function Calculator() {
             </div>
           </div>
 
-          {/* Detail rows */}
           <div className="divide-y divide-gray-800">
             {[
               { label: 'Capital invertido',                                    val: fmtVES(result.capital),               color: 'text-gray-300' },
@@ -233,6 +329,14 @@ export function Calculator() {
         !showTargets && (
           <div className="border border-dashed border-gray-700 rounded-xl py-6 text-center">
             <p className="text-sm text-gray-600">Ingresa capital, precio de compra y venta</p>
+            {hasLiveRates && (
+              <button
+                onClick={useLiveRates}
+                className="mt-3 text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+              >
+                ↓ O usa las tasas actuales de {activeFiat}
+              </button>
+            )}
           </div>
         )
       )}
