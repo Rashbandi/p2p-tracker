@@ -108,3 +108,5 @@ El cliente refresca cada 60 segundos automáticamente vía `useP2PRates`.
 - Top 10 comerciantes Binance por fiat
 - Promedio de precio de compra y venta
 - Spread calculado
+
+..
