@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useP2PRates, RatesFilter } from '@/hooks/useP2PRates'
 import { fmtVES } from '@/lib/utils'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
+import { BankDropdown } from '@/components/ui/BankDropdown'
+import { VES_BANKS, EXTRA_PAY_METHODS } from '@/lib/ves-banks'
 import type { Fiat } from '@/types'
 
 const FIATS: Fiat[] = ['VES', 'COP', 'ARS', 'BRL']
@@ -11,18 +13,11 @@ const FLAG: Record<string, string> = {
   VES: '🇻🇪', COP: '🇨🇴', ARS: '🇦🇷', BRL: '🇧🇷', PEN: '🇵🇪', CLP: '🇨🇱',
 }
 
-// Binance P2P payment method identifiers for Venezuela
-const PAY_METHODS = [
-  { id: 'BancoDeVenezuela', label: 'Banco de Venezuela' },
-  { id: 'Banesco',           label: 'Banesco' },
-  { id: 'Mercantil',         label: 'Mercantil' },
-  { id: 'Provincial',        label: 'Provincial' },
-  { id: 'BNC',               label: 'BNC' },
-  { id: 'Bancaribe',         label: 'Bancaribe' },
-  { id: 'PagoMovil',         label: 'Pago Móvil' },
-  { id: 'Zinli',             label: 'Zinli' },
-  { id: 'Reserve',           label: 'Reserve' },
-]
+// All known pay method labels for tag display
+const ALL_PAY_LABELS: Record<string, string> = {
+  ...Object.fromEntries(VES_BANKS.filter(b => b.binanceId).map(b => [b.binanceId!, b.name])),
+  ...Object.fromEntries(EXTRA_PAY_METHODS.map(m => [m.binanceId, m.name])),
+}
 
 export function RatesPanel() {
   const [activeFiat, setActiveFiat] = useState<Fiat>('VES')
@@ -37,12 +32,6 @@ export function RatesPanel() {
   const rate = rates[activeFiat]
 
   const hasFilters = appliedFilters.payTypes.length > 0 || !!appliedFilters.transAmount
-
-  function togglePay(id: string) {
-    setSelectedPay(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    )
-  }
 
   function applyFilters() {
     setAppliedFilters({ payTypes: selectedPay, transAmount })
@@ -104,7 +93,7 @@ export function RatesPanel() {
       {/* Filter panel */}
       {showFilters && (
         <div className="mb-4 p-4 bg-gray-800/60 border border-gray-700 rounded-xl">
-          {/* Amount in fiat */}
+          {/* Amount in active fiat */}
           <div className="mb-4">
             <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-2">
               Monto en {activeFiat} a operar
@@ -112,7 +101,12 @@ export function RatesPanel() {
             <div className="relative">
               <input
                 type="number"
-                placeholder={activeFiat === 'VES' ? 'ej: 500000' : activeFiat === 'COP' ? 'ej: 2000000' : activeFiat === 'ARS' ? 'ej: 1000000' : 'ej: 5000'}
+                placeholder={
+                  activeFiat === 'VES' ? 'ej: 500000'
+                  : activeFiat === 'COP' ? 'ej: 2000000'
+                  : activeFiat === 'ARS' ? 'ej: 1000000'
+                  : 'ej: 5000'
+                }
                 value={transAmount}
                 onChange={e => setTransAmount(e.target.value)}
                 className="w-full bg-[#07080f] border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-green-500 focus:outline-none"
@@ -124,31 +118,18 @@ export function RatesPanel() {
             </p>
           </div>
 
-          {/* Payment methods */}
-          <div className="mb-4">
-            <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-2">
-              Métodos de pago
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {PAY_METHODS.map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => togglePay(m.id)}
-                  className={[
-                    'px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
-                    selectedPay.includes(m.id)
-                      ? 'bg-green-500/15 text-green-400 border border-green-500/30'
-                      : 'bg-gray-700/50 text-gray-500 hover:text-gray-300 border border-transparent',
-                  ].join(' ')}
-                >
-                  {m.label}
-                </button>
-              ))}
+          {/* Bank / payment method picker — only for VES */}
+          {activeFiat === 'VES' && (
+            <div className="mb-4">
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-2">
+                Banco · Método de pago
+              </label>
+              <BankDropdown selected={selectedPay} onChange={setSelectedPay} />
             </div>
-          </div>
+          )}
 
           {/* Actions */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-1">
             <button
               onClick={applyFilters}
               className="flex-1 py-1.5 bg-green-500 hover:bg-green-400 text-gray-900 text-xs font-semibold rounded-lg transition-colors"
@@ -175,14 +156,11 @@ export function RatesPanel() {
               {Number(appliedFilters.transAmount).toLocaleString()} {activeFiat}
             </span>
           )}
-          {appliedFilters.payTypes.map(id => {
-            const m = PAY_METHODS.find(x => x.id === id)
-            return (
-              <span key={id} className="px-2 py-0.5 bg-green-500/10 border border-green-500/20 text-green-400 text-xs rounded-full">
-                {m?.label ?? id}
-              </span>
-            )
-          })}
+          {appliedFilters.payTypes.map(id => (
+            <span key={id} className="px-2 py-0.5 bg-green-500/10 border border-green-500/20 text-green-400 text-xs rounded-full">
+              {ALL_PAY_LABELS[id] ?? id}
+            </span>
+          ))}
           <button onClick={clearFilters} className="text-xs text-gray-600 hover:text-gray-400 ml-1">
             × Limpiar
           </button>
