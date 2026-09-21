@@ -11,6 +11,7 @@ const FLAG: Record<string, string> = {
   VES: '🇻🇪', COP: '🇨🇴', ARS: '🇦🇷', BRL: '🇧🇷', PEN: '🇵🇪', CLP: '🇨🇱',
 }
 
+// Binance P2P payment method identifiers for Venezuela
 const PAY_METHODS = [
   { id: 'BancoDeVenezuela', label: 'Banco de Venezuela' },
   { id: 'Banesco',           label: 'Banesco' },
@@ -27,6 +28,7 @@ export function RatesPanel() {
   const [activeFiat, setActiveFiat] = useState<Fiat>('VES')
   const [showFilters, setShowFilters] = useState(false)
 
+  // Filter state
   const [selectedPay, setSelectedPay] = useState<string[]>([])
   const [transAmount, setTransAmount] = useState('')
   const [appliedFilters, setAppliedFilters] = useState<RatesFilter>({ payTypes: [], transAmount: '' })
@@ -64,6 +66,7 @@ export function RatesPanel() {
             </span>
           )}
 
+          {/* Filter button */}
           <button
             onClick={() => setShowFilters(f => !f)}
             className={[
@@ -72,18 +75,23 @@ export function RatesPanel() {
                 ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                 : 'hover:bg-gray-700 text-gray-500 hover:text-gray-300',
             ].join(' ')}
+            title="Filtros"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
             </svg>
             Filtros
-            {hasFilters && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+            {hasFilters && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            )}
           </button>
 
+          {/* Refresh */}
           <button
             onClick={refresh}
             className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors"
+            title="Actualizar tasas"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -93,8 +101,10 @@ export function RatesPanel() {
         </div>
       </CardHeader>
 
+      {/* Filter panel */}
       {showFilters && (
         <div className="mb-4 p-4 bg-gray-800/60 border border-gray-700 rounded-xl">
+          {/* Amount */}
           <div className="mb-4">
             <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-2">
               Monto USDT a operar
@@ -109,9 +119,12 @@ export function RatesPanel() {
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">USDT</span>
             </div>
-            <p className="text-xs text-gray-600 mt-1">Muestra solo anuncios que cubren este monto</p>
+            <p className="text-xs text-gray-600 mt-1">
+              Muestra solo anuncios que cubren este monto
+            </p>
           </div>
 
+          {/* Payment methods */}
           <div className="mb-4">
             <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-2">
               Métodos de pago
@@ -134,6 +147,7 @@ export function RatesPanel() {
             </div>
           </div>
 
+          {/* Actions */}
           <div className="flex gap-2">
             <button
               onClick={applyFilters}
@@ -153,6 +167,7 @@ export function RatesPanel() {
         </div>
       )}
 
+      {/* Active filters summary */}
       {hasFilters && !showFilters && (
         <div className="flex flex-wrap gap-1.5 mb-3">
           {appliedFilters.transAmount && (
@@ -174,6 +189,7 @@ export function RatesPanel() {
         </div>
       )}
 
+      {/* Fiat tabs */}
       <div className="flex gap-1.5 mb-4">
         {FIATS.map(fiat => (
           <button
@@ -202,6 +218,7 @@ export function RatesPanel() {
         <div className="text-center py-4 text-sm text-red-400">{error}</div>
       ) : rate ? (
         <>
+          {/* Summary */}
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="bg-gray-800/50 rounded-xl p-3 text-center">
               <p className="text-xs text-gray-500 mb-1">Compra prom.</p>
@@ -219,12 +236,40 @@ export function RatesPanel() {
             </div>
           </div>
 
+          {/* P2P logic info banner */}
+          <div className="mb-4 p-3 bg-amber-500/8 border border-amber-500/20 rounded-xl">
+            <p className="text-xs text-amber-400 font-semibold mb-1.5 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              ¿Cómo fijar tu precio?
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex items-start gap-1.5">
+                <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                <span className="text-gray-400">
+                  Anuncio de <span className="text-green-400 font-medium">VENTA</span>
+                  {' → '}mira la columna de <span className="text-blue-400 font-medium">Compra</span>
+                </span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                <span className="text-gray-400">
+                  Anuncio de <span className="text-blue-400 font-medium">COMPRA</span>
+                  {' → '}mira la columna de <span className="text-green-400 font-medium">Venta</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Top merchants */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+              <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
                 Top compradores
               </p>
+              <p className="text-[10px] text-green-500/70 mb-2 ml-3">📌 Ref. para tu anuncio de VENTA</p>
               <div className="flex flex-col gap-1">
                 {rate.buyRates.slice(0, 5).map((r, i) => (
                   <div key={i} className="flex items-center justify-between px-2.5 py-1.5 bg-gray-800/40 rounded-lg">
@@ -239,10 +284,11 @@ export function RatesPanel() {
             </div>
 
             <div>
-              <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+              <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
                 Top vendedores
               </p>
+              <p className="text-[10px] text-blue-500/70 mb-2 ml-3">📌 Ref. para tu anuncio de COMPRA</p>
               <div className="flex flex-col gap-1">
                 {rate.sellRates.slice(0, 5).map((r, i) => (
                   <div key={i} className="flex items-center justify-between px-2.5 py-1.5 bg-gray-800/40 rounded-lg">
