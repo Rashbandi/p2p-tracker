@@ -38,7 +38,7 @@ function getOpportunity(roi: number) {
   return            { label: '🔴 No rentable',                  color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/30'    }
 }
 
-type Tab = 'calc' | 'hold'
+type Tab = 'calc' | 'hold' | 'meta'
 
 export function Calculator() {
   const [tab, setTab] = useState<Tab>('calc')
@@ -55,6 +55,16 @@ export function Calculator() {
   const [holdUsdt, setHoldUsdt]         = useState('')
   const [holdBuyPrice, setHoldBuyPrice] = useState('')
   const [holdExchange, setHoldExchange] = useState<'binance' | 'bybit'>('binance')
+
+  // ── Tab 3: Meta diaria ─────────────────────────────────────────────────
+  const [metaCapital, setMetaCapital]   = useState('')
+  const [metaBuy, setMetaBuy]           = useState('')
+  const [metaSell, setMetaSell]         = useState('')
+  const [metaPayIdx, setMetaPayIdx]     = useState(0)
+  const [metaExchange, setMetaExchange] = useState<'binance' | 'bybit'>('binance')
+  const [metaGoal, setMetaGoal]         = useState('')
+  const [cicloMin, setCicloMin]         = useState('30')
+  const [horasDia, setHorasDia]         = useState('8')
 
   const { rates, activeFiat } = useRates()
   const liveRate    = rates[activeFiat]
@@ -97,6 +107,40 @@ export function Calculator() {
   // Spread real si pusieras tu anuncio de venta al precio de cada mercado (sellRates = vendedores actuales = tu competencia)
   const marketSellRates = liveRate?.sellRates?.slice(0, 5) ?? []
 
+  // ── Tab 3: Meta diaria ─────────────────────────────────────────────────
+  const metaVesComm = VES_PAY_METHODS[metaPayIdx].rate
+  const metaCap     = parseVES(metaCapital)
+  const metaBuyP    = parseVES(metaBuy)
+  const metaSelP    = parseVES(metaSell)
+  const metaGoalN   = parseVES(metaGoal)
+  const cicloN      = Math.max(1, parseFloat(cicloMin) || 30)
+  const horasN      = Math.max(1, Math.min(24, parseFloat(horasDia) || 8))
+
+  const metaResult = metaCap > 0 && metaBuyP > 0 && metaSelP > 0
+    ? calcP2P({ capital: metaCap, buyPrice: metaBuyP, sellPrice: metaSelP, vesComm: metaVesComm, exchange: metaExchange })
+    : null
+
+  const gananciaPorOp  = metaResult?.ganancia ?? 0
+  const roiPorOp       = metaResult?.roi ?? 0
+  const opsPorHora     = 60 / cicloN
+  const opsPorDia      = horasN * opsPorHora
+  const gananciaDia    = opsPorDia * gananciaPorOp
+  const opsParaMeta    = metaGoalN > 0 && gananciaPorOp > 0 ? metaGoalN / gananciaPorOp : null
+  const tiempoParaMeta = opsParaMeta !== null ? opsParaMeta * cicloN : null
+  const metaFactible   = opsParaMeta !== null && tiempoParaMeta !== null && tiempoParaMeta <= horasN * 60
+
+  function useLiveRatesMeta() {
+    if (!liveRate) return
+    if (liveRate.buyRates[0]?.price)  setMetaBuy(String(liveRate.buyRates[0].price))
+    if (liveRate.sellRates[0]?.price) setMetaSell(String(liveRate.sellRates[0].price))
+  }
+
+  function fmtMinutos(min: number) {
+    if (min < 60) return `${Math.ceil(min)} min`
+    const h = Math.floor(min / 60), m = Math.round(min % 60)
+    return m > 0 ? `${h}h ${m}min` : `${h}h`
+  }
+
   // El mejor precio de venta del mercado (lo más bajo entre los vendedores = tu competencia directa)
   const marketTopSell = marketSellRates[0]?.price ?? 0
   const marketSpread  = holdBuyP > 0 && marketTopSell > 0 ? calcHoldSpread(holdBuyP, marketTopSell, holdExchange) : null
@@ -105,9 +149,9 @@ export function Calculator() {
     <Card>
       <CardHeader>
         <CardTitle>Calculadora P2P</CardTitle>
-        {tab === 'calc' && hasLiveRates && (
+        {(tab === 'calc' || tab === 'meta') && hasLiveRates && (
           <button
-            onClick={useLiveRatesCalc}
+            onClick={tab === 'calc' ? useLiveRatesCalc : useLiveRatesMeta}
             disabled={loadingRates}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-500/10 border border-blue-500/25 text-blue-400 hover:bg-blue-500/20 transition-all disabled:opacity-50"
           >
@@ -122,24 +166,18 @@ export function Calculator() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 p-1 bg-gray-800/60 rounded-xl">
-        <button
-          onClick={() => setTab('calc')}
-          className={[
-            'flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all',
-            tab === 'calc' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300',
-          ].join(' ')}
-        >
-          ⚡ Simular operación
-        </button>
-        <button
-          onClick={() => setTab('hold')}
-          className={[
-            'flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all',
-            tab === 'hold' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300',
-          ].join(' ')}
-        >
-          💼 Fijar precio de venta
-        </button>
+        {([
+          { key: 'calc', label: '⚡ Simular' },
+          { key: 'hold', label: '💼 Precio venta' },
+          { key: 'meta', label: '📈 Meta diaria' },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={['flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all',
+              tab === t.key ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300',
+            ].join(' ')}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* ══════════════ TAB 1: SIMULAR OPERACIÓN ════════════════════════════ */}
@@ -527,6 +565,207 @@ export function Calculator() {
                   Referencia actual del mercado:{' '}
                   <span className="text-green-400 font-mono">{fmtVES(liveRate?.sellRates?.[0]?.price ?? 0)}</span>
                 </p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ══════════════ TAB 3: META DIARIA ══════════════════════════════════ */}
+      {tab === 'meta' && (
+        <>
+          {/* Contexto */}
+          <div className="mb-4 p-3 bg-amber-500/8 border border-amber-500/20 rounded-xl">
+            <p className="text-xs text-amber-400 font-semibold mb-0.5">¿Cuánto puedo ganar hoy?</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Ingresa tu capital, precios de tus anuncios y tu meta. Te decimos cuántas operaciones necesitas y cuánto produces por hora.
+            </p>
+          </div>
+
+          {/* Exchange + método de pago */}
+          <div className="flex gap-2 mb-3">
+            {(['binance', 'bybit'] as const).map(ex => (
+              <button key={ex} onClick={() => setMetaExchange(ex)}
+                className={['flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                  metaExchange === ex ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-gray-800 text-gray-500 hover:text-gray-300',
+                ].join(' ')}>
+                {ex === 'binance' ? '⬡ Binance' : '◈ Bybit'}
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-3">
+            <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1.5">Método de pago</label>
+            <div className="flex flex-wrap gap-1.5">
+              {VES_PAY_METHODS.map((m, i) => (
+                <button key={m.key} onClick={() => setMetaPayIdx(i)}
+                  className={['px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
+                    metaPayIdx === i ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-gray-800 text-gray-500 hover:text-gray-300',
+                  ].join(' ')}>
+                  {m.label}{m.rate > 0 && <span className="ml-1 text-gray-600">+{(m.rate * 100).toFixed(1)}%</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Inputs principales */}
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <NumInput label="Capital (Fiat)" placeholder="0,00" value={metaCapital} onChange={setMetaCapital} />
+            <NumInput label="Precio COMPRA" placeholder="0,00" value={metaBuy} onChange={setMetaBuy} />
+            <NumInput label="Precio VENTA"  placeholder="0,00" value={metaSell} onChange={setMetaSell} />
+          </div>
+
+          {hasLiveRates && !metaBuyP && (
+            <button onClick={useLiveRatesMeta}
+              className="w-full mb-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 text-xs font-semibold rounded-lg transition-colors">
+              ↓ Usar tasas actuales del mercado
+            </button>
+          )}
+
+          {/* Configuración de tiempo */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1.5">
+                Minutos por ciclo
+              </label>
+              <div className="relative">
+                <input
+                  type="number" min="5" max="240" placeholder="30"
+                  value={cicloMin} onChange={e => setCicloMin(e.target.value)}
+                  className="w-full bg-[#07080f] border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-gray-100 placeholder:text-gray-600 focus:border-blue-500 focus:outline-none"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-600">min</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1.5">
+                Horas de trabajo
+              </label>
+              <div className="relative">
+                <input
+                  type="number" min="1" max="16" placeholder="8"
+                  value={horasDia} onChange={e => setHorasDia(e.target.value)}
+                  className="w-full bg-[#07080f] border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-gray-100 placeholder:text-gray-600 focus:border-blue-500 focus:outline-none"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-600">h</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Ganancia por operación */}
+          {metaResult && (
+            <>
+              <div className="mb-4 p-3 bg-gray-800/50 border border-gray-700 rounded-xl">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 font-semibold">Por operación</p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[10px] text-gray-600 mb-0.5">Ganancia</p>
+                    <p className={`text-sm font-bold font-mono ${gananciaPorOp >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {gananciaPorOp >= 0 ? '+' : ''}{fmtVES(gananciaPorOp)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-600 mb-0.5">ROI</p>
+                    <p className={`text-sm font-bold font-mono ${roiPorOp >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {roiPorOp >= 0 ? '+' : ''}{roiPorOp.toFixed(2)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-600 mb-0.5">Ciclo</p>
+                    <p className="text-sm font-bold font-mono text-gray-300">{cicloN} min</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Meta de ganancia */}
+              <div className="mb-4">
+                <NumInput label="Meta de ganancia (VES)" placeholder="ej: 50.000,00" value={metaGoal} onChange={setMetaGoal} />
+              </div>
+
+              {/* Resultado meta */}
+              {metaGoalN > 0 && gananciaPorOp > 0 && (
+                <div className={['mb-4 p-4 rounded-xl border', metaFactible ? 'bg-green-500/8 border-green-500/25' : 'bg-red-500/8 border-red-500/25'].join(' ')}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`text-sm font-bold ${metaFactible ? 'text-green-400' : 'text-red-400'}`}>
+                      {metaFactible ? '✅ Meta alcanzable hoy' : '⚠️ Meta fuera de alcance'}
+                    </span>
+                    <span className="text-xs text-gray-500">{horasN}h de trabajo</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <p className="text-[10px] text-gray-500 mb-0.5">Operaciones</p>
+                      <p className="text-lg font-bold font-mono text-white">{Math.ceil(opsParaMeta!)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-500 mb-0.5">Tiempo</p>
+                      <p className="text-lg font-bold font-mono text-white">{fmtMinutos(tiempoParaMeta!)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-500 mb-0.5">Disponible</p>
+                      <p className="text-lg font-bold font-mono text-white">{fmtMinutos(horasN * 60)}</p>
+                    </div>
+                  </div>
+                  {!metaFactible && (
+                    <p className="mt-3 text-[11px] text-red-400/80 text-center">
+                      Necesitas {fmtMinutos(tiempoParaMeta! - horasN * 60)} más de tiempo, o mejor spread.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Proyección por horas */}
+              <div className="border border-gray-700 rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 bg-gray-800/60 border-b border-gray-700">
+                  <span className="text-xs font-semibold text-gray-300">Proyección de ganancia</span>
+                  <span className="text-[10px] text-gray-600 ml-2">capital × {opsPorHora.toFixed(1)} rondas/h</span>
+                </div>
+                <div className="divide-y divide-gray-800/60">
+                  {[1, 2, 4, 6, 8].filter(h => h <= horasN + 1).map(h => {
+                    const ops  = Math.floor(h * opsPorHora)
+                    const gan  = ops * gananciaPorOp
+                    const isWorkday = h === horasN
+                    return (
+                      <div key={h}
+                        className={['flex items-center justify-between px-4 py-2.5',
+                          isWorkday ? 'bg-amber-500/8' : 'hover:bg-gray-800/30',
+                        ].join(' ')}>
+                        <div className="flex items-center gap-2">
+                          <span className={['w-8 text-center text-xs font-bold font-mono rounded-md py-0.5',
+                            h <= 2 ? 'text-blue-400 bg-blue-500/10' : h <= 4 ? 'text-green-400 bg-green-500/10' : 'text-amber-400 bg-amber-500/10',
+                          ].join(' ')}>{h}h</span>
+                          <span className="text-xs text-gray-500">{ops} operaciones</span>
+                          {isWorkday && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold">tu jornada</span>}
+                        </div>
+                        <span className={`text-sm font-bold font-mono ${gan >= 0 ? 'text-green-300' : 'text-red-400'}`}>
+                          {gan >= 0 ? '+' : ''}{fmtVES(gan)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Resumen día completo */}
+                <div className="px-4 py-3 border-t border-gray-700 bg-gray-800/40 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold">Ganancia potencial · {horasN}h</p>
+                    <p className="text-[10px] text-gray-600">{Math.floor(opsPorDia)} operaciones · {fmtVES(metaCap)} por ronda</p>
+                  </div>
+                  <p className={`text-xl font-bold font-mono ${gananciaDia >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {gananciaDia >= 0 ? '+' : ''}{fmtVES(gananciaDia)}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {!metaResult && (
+            <div className="border border-dashed border-gray-700 rounded-xl py-8 text-center">
+              <p className="text-2xl mb-2">🎯</p>
+              <p className="text-sm text-gray-500 font-medium">¿Cuánto quieres ganar hoy?</p>
+              <p className="text-xs text-gray-600 mt-1">Ingresa capital y precios de tus anuncios</p>
+              {hasLiveRates && (
+                <button onClick={useLiveRatesMeta} className="mt-3 text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors">
+                  ↓ Cargar tasas actuales del mercado
+                </button>
               )}
             </div>
           )}
