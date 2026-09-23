@@ -80,10 +80,14 @@ export async function GET(req: NextRequest) {
       fetchBinanceRates(fiat, 'SELL', payTypes, transAmount),
     ])
 
-    const avgBuy = avg(buyRates)
-    const avgSell = avg(sellRates)
-    const spread = avgSell - avgBuy
-    const spreadPct = avgBuy > 0 ? (spread / avgBuy) * 100 : 0
+    const avgBuy  = avg(buyRates)   // compradores del mercado → precio de VENTA de IC
+    const avgSell = avg(sellRates)  // vendedores del mercado  → precio de COMPRA de IC
+
+    // Spread desde la perspectiva del anunciante (IC):
+    //   IC compra de los vendedores (sellRates) y vende a los compradores (buyRates)
+    //   spread = buyRates[0] - sellRates[0] → POSITIVO cuando el mercado es normal
+    const spread    = avgBuy - avgSell
+    const spreadPct = avgSell > 0 ? (spread / avgSell) * 100 : 0
 
     const result: P2PRates = {
       fiat,
