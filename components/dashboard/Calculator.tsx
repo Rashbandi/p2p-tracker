@@ -91,11 +91,12 @@ export function Calculator() {
   function useLiveRatesCalc() {
     if (!liveRate) return
     setLoadingRates(true)
-    // IC compra de los VENDEDORES del mercado (sellRates → tradeType SELL)
-    // IC vende a los COMPRADORES del mercado (buyRates → tradeType BUY)
-    // buyRates[0] > sellRates[0] en mercado normal → spread positivo para IC
-    if (liveRate.sellRates[0]?.price) setBuy(String(liveRate.sellRates[0].price))
-    if (liveRate.buyRates[0]?.price)  setSell(String(liveRate.buyRates[0].price))
+    // Usamos PROMEDIOS (mismo origen que el spread del RatesPanel) para que los
+    // números sean coherentes entre ambos paneles.
+    // avgSell = promedio de vendedores del mercado → referencia precio COMPRA de IC
+    // avgBuy  = promedio de compradores del mercado → referencia precio VENTA de IC
+    if (liveRate.avgSell > 0) setBuy(String(Math.round(liveRate.avgSell)))
+    if (liveRate.avgBuy  > 0) setSell(String(Math.round(liveRate.avgBuy)))
     setTimeout(() => setLoadingRates(false), 300)
   }
 
@@ -131,8 +132,8 @@ export function Calculator() {
 
   function useLiveRatesMeta() {
     if (!liveRate) return
-    if (liveRate.sellRates[0]?.price) setMetaBuy(String(liveRate.sellRates[0].price))
-    if (liveRate.buyRates[0]?.price)  setMetaSell(String(liveRate.buyRates[0].price))
+    if (liveRate.avgSell > 0) setMetaBuy(String(Math.round(liveRate.avgSell)))
+    if (liveRate.avgBuy  > 0) setMetaSell(String(Math.round(liveRate.avgBuy)))
   }
 
   function fmtMinutos(min: number) {
@@ -218,29 +219,32 @@ export function Calculator() {
           {/* Market overview */}
           {hasLiveRates && !buyP && (
             <div className="mb-4 p-3 bg-gray-800/50 border border-gray-700 rounded-xl">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 font-semibold">Referencia de mercado · {activeFiat}</p>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 font-semibold">
+                Referencia de mercado · {activeFiat}
+                <span className="ml-1.5 normal-case text-gray-700 font-normal">prom. 20 anunciantes</span>
+              </p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
-                  <p className="text-[10px] text-gray-600 mb-0.5">Vendedores mercado</p>
-                  <p className="text-xs font-mono font-bold text-blue-400">{fmtVES(liveRate.sellRates[0]?.price ?? 0)}</p>
-                  <p className="text-[10px] text-blue-500/60">tu anuncio COMPRA ↓</p>
+                  <p className="text-[10px] text-gray-600 mb-0.5">Vendedores (prom)</p>
+                  <p className="text-xs font-mono font-bold text-blue-400">{fmtVES(liveRate.avgSell)}</p>
+                  <p className="text-[10px] text-blue-500/60">precio COMPRA IC ↓</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-[10px] text-gray-600 mb-0.5">Spread IC</p>
+                  <p className="text-[10px] text-gray-600 mb-0.5">Spread bruto</p>
                   <p className={`text-xs font-mono font-bold ${liveRate.spreadPct > 0.8 ? 'text-green-400' : liveRate.spreadPct > 0 ? 'text-amber-400' : 'text-red-400'}`}>
                     {liveRate.spreadPct > 0 ? '+' : ''}{liveRate.spreadPct.toFixed(2)}%
                   </p>
-                  <p className="text-[10px] text-gray-600">bruto s/ fees</p>
+                  <p className="text-[10px] text-gray-600">s/ fees</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-[10px] text-gray-600 mb-0.5">Compradores mercado</p>
-                  <p className="text-xs font-mono font-bold text-green-400">{fmtVES(liveRate.buyRates[0]?.price ?? 0)}</p>
-                  <p className="text-[10px] text-green-500/60">tu anuncio VENTA ↑</p>
+                  <p className="text-[10px] text-gray-600 mb-0.5">Compradores (prom)</p>
+                  <p className="text-xs font-mono font-bold text-green-400">{fmtVES(liveRate.avgBuy)}</p>
+                  <p className="text-[10px] text-green-500/60">precio VENTA IC ↑</p>
                 </div>
               </div>
               <button onClick={useLiveRatesCalc}
                 className="mt-3 w-full py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 text-xs font-semibold rounded-lg transition-colors">
-                ↓ Cargar estos precios
+                ↓ Cargar precios promedio
               </button>
             </div>
           )}
@@ -562,8 +566,8 @@ export function Calculator() {
               <p className="text-sm text-gray-600">Ingresa tu precio de anuncio de COMPRA</p>
               {hasLiveRates && (
                 <p className="text-xs text-gray-700 mt-1">
-                  Referencia actual del mercado:{' '}
-                  <span className="text-green-400 font-mono">{fmtVES(liveRate?.sellRates?.[0]?.price ?? 0)}</span>
+                  Referencia de mercado (prom. vendedores):{' '}
+                  <span className="text-green-400 font-mono">{fmtVES(liveRate?.avgSell ?? 0)}</span>
                 </p>
               )}
             </div>
