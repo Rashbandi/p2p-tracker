@@ -81,8 +81,11 @@ export function Calculator() {
   function useLiveRatesCalc() {
     if (!liveRate) return
     setLoadingRates(true)
-    if (liveRate.sellRates[0]?.price) setBuy(String(liveRate.sellRates[0].price))
-    if (liveRate.buyRates[0]?.price)  setSell(String(liveRate.buyRates[0].price))
+    // Tu anuncio COMPRA compite con los compradores del mercado (buyRates)
+    // Tu anuncio VENTA compite con los vendedores del mercado (sellRates)
+    // sellRates[0] > buyRates[0] en mercado normal → spread positivo
+    if (liveRate.buyRates[0]?.price)  setBuy(String(liveRate.buyRates[0].price))
+    if (liveRate.sellRates[0]?.price) setSell(String(liveRate.sellRates[0].price))
     setTimeout(() => setLoadingRates(false), 300)
   }
 
@@ -180,9 +183,9 @@ export function Calculator() {
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 font-semibold">Referencia de mercado · {activeFiat}</p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
-                  <p className="text-[10px] text-gray-600 mb-0.5">Top vendedor (ref. compra)</p>
-                  <p className="text-xs font-mono font-bold text-green-400">{fmtVES(liveRate.sellRates[0]?.price ?? 0)}</p>
-                  <p className="text-[10px] text-green-500/60">tu anuncio COMPRA ↓</p>
+                  <p className="text-[10px] text-gray-600 mb-0.5">Mejores compradores</p>
+                  <p className="text-xs font-mono font-bold text-blue-400">{fmtVES(liveRate.buyRates[0]?.price ?? 0)}</p>
+                  <p className="text-[10px] text-blue-500/60">ref. tu anuncio COMPRA</p>
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] text-gray-600 mb-0.5">Spread bruto</p>
@@ -192,9 +195,9 @@ export function Calculator() {
                   <p className="text-[10px] text-gray-600">−0.60% fees</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-[10px] text-gray-600 mb-0.5">Top comprador (ref. venta)</p>
-                  <p className="text-xs font-mono font-bold text-blue-400">{fmtVES(liveRate.buyRates[0]?.price ?? 0)}</p>
-                  <p className="text-[10px] text-blue-500/60">tu anuncio VENTA ↑</p>
+                  <p className="text-[10px] text-gray-600 mb-0.5">Mejores vendedores</p>
+                  <p className="text-xs font-mono font-bold text-green-400">{fmtVES(liveRate.sellRates[0]?.price ?? 0)}</p>
+                  <p className="text-[10px] text-green-500/60">ref. tu anuncio VENTA</p>
                 </div>
               </div>
               <button onClick={useLiveRatesCalc}
@@ -357,11 +360,11 @@ export function Calculator() {
                   onChange={e => setHoldBuyPrice(e.target.value)}
                   className="w-full bg-[#07080f] border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-gray-100 placeholder:text-gray-600 focus:border-blue-500 focus:outline-none"
                 />
-                {hasLiveRates && liveRate?.sellRates?.[0]?.price && (
+                {hasLiveRates && liveRate?.buyRates?.[0]?.price && (
                   <button
-                    onClick={() => setHoldBuyPrice(String(liveRate.sellRates[0].price))}
+                    onClick={() => setHoldBuyPrice(String(liveRate.buyRates[0].price))}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-blue-500 hover:text-blue-300 font-bold transition-colors"
-                    title="Usar precio de mercado actual"
+                    title="Usar mejor precio comprador del mercado"
                   >
                     hoy
                   </button>
