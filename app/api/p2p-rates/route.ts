@@ -56,7 +56,8 @@ async function fetchBinanceRates(
     merchant: item.advertiser.nickName,
     minAmount: parseFloat(item.adv.minSingleTransAmount),
     maxAmount: parseFloat(item.adv.dynamicMaxSingleTransAmount),
-    payMethods: item.adv.tradeMethods?.map(m => m.tradeMethodName) ?? [],
+    payMethods:    item.adv.tradeMethods?.map(m => m.tradeMethodName) ?? [],
+    payMethodIds:  item.adv.tradeMethods?.map(m => m.identifier)      ?? [],
   }))
 }
 
@@ -70,6 +71,7 @@ export async function GET(req: NextRequest) {
   const fiat = (searchParams.get('fiat') ?? 'VES').toUpperCase() as Fiat
   const payTypesRaw = searchParams.get('payTypes') ?? ''
   const transAmountRaw = searchParams.get('transAmount') ?? ''
+  const debug = searchParams.get('debug') === '1'
 
   const payTypes = payTypesRaw ? payTypesRaw.split(',').filter(Boolean) : []
   const transAmount = transAmountRaw ? parseFloat(transAmountRaw) : null
@@ -79,6 +81,22 @@ export async function GET(req: NextRequest) {
       fetchBinanceRates(fiat, 'BUY', payTypes, transAmount),
       fetchBinanceRates(fiat, 'SELL', payTypes, transAmount),
     ])
+
+    // ?debug=1 → devuelve los identificadores únicos que usa Binance (útil para configurar payTypes)
+    if (debug) {
+      const allIds = new Set<string>()
+      const idToName: Record<string, string> = {}
+      ;[...buyRates, ...sellRates].forEach(r => {
+        r.payMethodIds.forEach((id, i) => {
+          allIds.add(id)
+          idToName[id] = r.payMethods[i] ?? id
+        })
+      })
+      return NextResponse.json(
+        { fiat, payTypesSent: payTypes, identifiersFound: Array.from(allIds).map(id => ({ id, name: idToName[id] })) },
+        { headers: { 'Cache-Control': 'no-store' } }
+      )
+    }
 
     const avgBuy  = avg(buyRates)   // compradores del mercado → precio de VENTA de IC
     const avgSell = avg(sellRates)  // vendedores del mercado  → precio de COMPRA de IC
