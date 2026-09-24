@@ -16,7 +16,9 @@ export const BYBIT_FEE = 0                      // 0% P2P
 export const VES_PAY_METHODS: VesPayMethod[] = [
   { label: 'Pago Móvil',             rate: 0.003, key: 'pago_movil',   binancePayTypes: ['MOBILE_BALANCE'] },
   { label: 'Transf. Interbancaria',  rate: 0.003, key: 'transf_inter', binancePayTypes: ['BANK']           },
-  { label: 'Transf. Mismo Banco',    rate: 0,     key: 'transf_mismo', binancePayTypes: ['SAME_BANK']      },
+  // 'Transf. Mismo Banco' no tiene identificador único en Binance VES —
+  // IC elige el banco internamente; sin filtro = mercado general (todos los bancos)
+  { label: 'Transf. Mismo Banco',    rate: 0,     key: 'transf_mismo', binancePayTypes: []                 },
   { label: 'Zinli',                  rate: 0,     key: 'zinli',         binancePayTypes: ['Zinli']          },
   { label: 'Reserve',                rate: 0,     key: 'reserve',       binancePayTypes: ['Reserve']        },
 ]
