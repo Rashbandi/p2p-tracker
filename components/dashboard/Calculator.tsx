@@ -1,10 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { calcP2P, fmtVES, fmtUSDT, fmtPct, parseVES } from '@/lib/utils'
 import { VES_PAY_METHODS, BINANCE_MAKER_FEE } from '@/lib/constants'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { NumInput } from '@/components/ui/Input'
 import { useRates } from '@/context/RatesContext'
+import type { P2PRates } from '@/types'
 
 // Para Tab 2: ya tengo los USDT. Solo necesito cubrir el fee de VENTA.
 // PSell × (1 - makerFee) = PBuy × (1 + targetPct/100)
@@ -78,23 +79,58 @@ export function Calculator() {
   const liveRate     = rates[activeFiat]
   const hasLiveRates = !!liveRate?.buyRates?.length && !!liveRate?.sellRates?.length
 
+  // ── Tab 1: tasas filtradas por banco + monto ────────────────────────────
+  const [stratRate,     setStratRate]     = useState<P2PRates | null>(null)
+  const [stratFetching, setStratFetching] = useState(false)
+
+  useEffect(() => {
+    const payMethod       = VES_PAY_METHODS[stratPayIdx]
+    const binancePayTypes = payMethod.binancePayTypes ?? []
+    const capital         = parseVES(stratCapital)
+
+    const controller = new AbortController()
+
+    const doFetch = () => {
+      const params = new URLSearchParams({ fiat: activeFiat })
+      if (binancePayTypes.length > 0) params.set('payTypes', binancePayTypes.join(','))
+      if (capital > 0)                params.set('transAmount', String(capital))
+
+      setStratFetching(true)
+      fetch(`/api/p2p-rates?${params}`, { signal: controller.signal })
+        .then(r => r.json())
+        .then((data: P2PRates) => {
+          if (!controller.signal.aborted && !('error' in data)) setStratRate(data)
+        })
+        .catch(() => {/* aborted or network error */})
+        .finally(() => { if (!controller.signal.aborted) setStratFetching(false) })
+    }
+
+    // Debounce capital changes (typing); pay-method changes are fast
+    const timer = setTimeout(doFetch, 500)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [stratPayIdx, stratCapital, activeFiat])
+
+  // Mercado filtrado > mercado general (mientras carga, mantiene el último resultado)
+  const effectiveRate     = stratRate ?? liveRate
+  const hasEffectiveRates = !!effectiveRate?.buyRates?.length && !!effectiveRate?.sellRates?.length
+
   // ── Tab 1: lógica de estrategia ────────────────────────────────────────
   const stratVesComm = VES_PAY_METHODS[stratPayIdx].rate
 
   // Para posicionarse en COMPRA: superar al vendedor en posición N ofreciendo 1 VES más
   const compraAt = (pos: number): number => {
-    const r = liveRate?.sellRates[pos - 1]
+    const r = effectiveRate?.sellRates[pos - 1]
     return r ? r.price + 1 : 0
   }
 
   // Para posicionarse en VENTA: superar al comprador en posición N ofreciendo 1 VES menos
   const ventaAt = (pos: number): number => {
-    const r = liveRate?.buyRates[pos - 1]
+    const r = effectiveRate?.buyRates[pos - 1]
     return r ? r.price - 1 : 0
   }
 
   // Matriz ROI 5×5 (filas = posición COMPRA, columnas = posición VENTA)
-  const matrixRoi: (number | null)[][] = hasLiveRates
+  const matrixRoi: (number | null)[][] = hasEffectiveRates
     ? Array.from({ length: N }, (_, i) =>
         Array.from({ length: N }, (_, j) => {
           const bp = compraAt(i + 1)
@@ -115,7 +151,7 @@ export function Calculator() {
   const stratBuyP  = compraAt(stratBuyPos)
   const stratSellP = ventaAt(stratSellPos)
 
-  const stratResult = hasLiveRates && stratCap > 0 && stratBuyP > 0 && stratSellP > stratBuyP
+  const stratResult = hasEffectiveRates && stratCap > 0 && stratBuyP > 0 && stratSellP > stratBuyP
     ? calcP2P({ capital: stratCap, buyPrice: stratBuyP, sellPrice: stratSellP, vesComm: stratVesComm, exchange: stratExchange })
     : null
 
@@ -234,7 +270,7 @@ export function Calculator() {
             </div>
           </div>
 
-          {hasLiveRates ? (
+          {hasEffectiveRates || hasLiveRates ? (
             <>
               {/* ── Escalera de mercado ─────────────────────────────────── */}
               <div className="mb-4">
@@ -242,10 +278,24 @@ export function Calculator() {
                   <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
                     Escalera de mercado · {activeFiat}
                   </p>
-                  <span className="flex items-center gap-1 text-[10px] text-green-500">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    En vivo
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {stratFetching && (
+                      <span className="text-[10px] text-indigo-400 animate-pulse">actualizando…</span>
+                    )}
+                    {stratRate && !stratFetching && (
+                      <span className="flex items-center gap-1 text-[10px] text-indigo-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                        {VES_PAY_METHODS[stratPayIdx].label}
+                        {stratCap > 0 && <> · {fmtVES(stratCap)}</>}
+                      </span>
+                    )}
+                    {!stratRate && !stratFetching && (
+                      <span className="flex items-center gap-1 text-[10px] text-green-500">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        En vivo
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -257,7 +307,7 @@ export function Calculator() {
                     <div className="border border-t-0 border-blue-500/15 rounded-b-xl overflow-hidden divide-y divide-gray-800/60">
                       {Array.from({ length: N }, (_, i) => {
                         const pos   = i + 1
-                        const sellR = liveRate.sellRates[i]
+                        const sellR = effectiveRate?.sellRates[i]
                         const compP = sellR ? sellR.price + 1 : 0
                         const isSel = stratBuyPos === pos
                         return (
@@ -298,7 +348,7 @@ export function Calculator() {
                     <div className="border border-t-0 border-green-500/15 rounded-b-xl overflow-hidden divide-y divide-gray-800/60">
                       {Array.from({ length: N }, (_, i) => {
                         const pos   = i + 1
-                        const buyR  = liveRate.buyRates[i]
+                        const buyR  = effectiveRate?.buyRates[i]
                         const ventP = buyR ? buyR.price - 1 : 0
                         const isSel = stratSellPos === pos
                         return (
@@ -501,10 +551,14 @@ export function Calculator() {
             </>
           ) : (
             <div className="border border-dashed border-gray-700 rounded-xl py-12 text-center">
-              <p className="text-2xl mb-2">📊</p>
-              <p className="text-sm text-gray-500 font-medium">Cargando datos del mercado…</p>
+              <p className="text-2xl mb-2">{stratFetching ? '🔄' : '📊'}</p>
+              <p className="text-sm text-gray-500 font-medium">
+                {stratFetching ? 'Filtrando mercado…' : 'Cargando datos del mercado…'}
+              </p>
               <p className="text-xs text-gray-600 mt-1">
-                Las tasas de {activeFiat} se actualizan automáticamente
+                {stratFetching
+                  ? `Buscando ${VES_PAY_METHODS[stratPayIdx].label}${stratCap > 0 ? ` · ${fmtVES(stratCap)} VES` : ''}`
+                  : `Las tasas de ${activeFiat} se actualizan automáticamente`}
               </p>
             </div>
           )}
