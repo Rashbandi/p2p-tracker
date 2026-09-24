@@ -25,6 +25,8 @@ export interface VesPayMethod {
   label: string
   rate: number
   key: string
+  /** Identifiers used by the Binance P2P API payTypes filter */
+  binancePayTypes: string[]
 }
 
 export interface CalcResult {
