@@ -7,16 +7,18 @@ export const TIMEOUT_MS = 30 * 60 * 1000       // 30 min inactivity
 export const WARN_BEFORE_MS = 5 * 60 * 1000    // show warning 5 min before
 
 // Commissions
-export const BINANCE_MAKER_FEE = 0.0025         // 0.25% both buy and sell
+export const BINANCE_MAKER_FEE = 0.003           // 0.30% Latam maker fee (post ad)
+export const BINANCE_TAKER_FEE = 0              // 0% taker fee (accept ad)
 export const BYBIT_FEE = 0                      // 0% P2P
 
 // VES payment methods commissions
+// binancePayTypes: identifiers used by the Binance P2P API payTypes filter
 export const VES_PAY_METHODS: VesPayMethod[] = [
-  { label: 'Pago Móvil',             rate: 0.003, key: 'pago_movil' },
-  { label: 'Transf. Interbancaria',  rate: 0.003, key: 'transf_inter' },
-  { label: 'Transf. Mismo Banco',    rate: 0,     key: 'transf_mismo' },
-  { label: 'Zinli',                  rate: 0,     key: 'zinli' },
-  { label: 'Reserve',                rate: 0,     key: 'reserve' },
+  { label: 'Pago Móvil',             rate: 0.003, key: 'pago_movil',   binancePayTypes: ['MOBILE_BALANCE'] },
+  { label: 'Transf. Interbancaria',  rate: 0.003, key: 'transf_inter', binancePayTypes: ['BANK']           },
+  { label: 'Transf. Mismo Banco',    rate: 0,     key: 'transf_mismo', binancePayTypes: ['SAME_BANK']      },
+  { label: 'Zinli',                  rate: 0,     key: 'zinli',         binancePayTypes: ['Zinli']          },
+  { label: 'Reserve',                rate: 0,     key: 'reserve',       binancePayTypes: ['Reserve']        },
 ]
 
 // Available fiats
