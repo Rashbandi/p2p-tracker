@@ -7,7 +7,8 @@ export interface P2PRate {
   merchant: string
   minAmount: number
   maxAmount: number
-  payMethods: string[]
+  payMethods:   string[]   // display names (tradeMethodName)
+  payMethodIds: string[]   // API identifiers (identifier) — use these for payTypes filter
 }
 
 export interface P2PRates {
