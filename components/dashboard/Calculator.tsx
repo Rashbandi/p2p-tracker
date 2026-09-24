@@ -110,9 +110,14 @@ export function Calculator() {
     return () => { clearTimeout(timer); controller.abort() }
   }, [stratPayIdx, stratCapital, activeFiat])
 
-  // Mercado filtrado > mercado general (mientras carga, mantiene el último resultado)
-  const effectiveRate     = stratRate ?? liveRate
+  // Mercado filtrado > mercado general.
+  // IMPORTANTE: si stratRate llega con arrays vacíos (filtro sin resultados en Binance),
+  // NO usarlo — caer al mercado general para que el ladder nunca quede vacío.
+  const stratHasData  = !!(stratRate?.buyRates?.length && stratRate?.sellRates?.length)
+  const effectiveRate = stratHasData ? stratRate : liveRate
   const hasEffectiveRates = !!effectiveRate?.buyRates?.length && !!effectiveRate?.sellRates?.length
+  // true cuando el ladder muestra tasas filtradas reales (no fallback al mercado general)
+  const usingFilteredRates = stratHasData
 
   // ── Tab 1: lógica de estrategia ────────────────────────────────────────
   const stratVesComm = VES_PAY_METHODS[stratPayIdx].rate
@@ -282,13 +287,22 @@ export function Calculator() {
                     {stratFetching && (
                       <span className="text-[10px] text-indigo-400 animate-pulse">actualizando…</span>
                     )}
-                    {stratRate && !stratFetching && (
+                    {/* Filtro activo con datos reales */}
+                    {usingFilteredRates && !stratFetching && (
                       <span className="flex items-center gap-1 text-[10px] text-indigo-400">
                         <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                         {VES_PAY_METHODS[stratPayIdx].label}
                         {stratCap > 0 && <> · {fmtVES(stratCap)}</>}
                       </span>
                     )}
+                    {/* Filtro sin resultados → fallback a mercado general */}
+                    {stratRate && !stratHasData && !stratFetching && (
+                      <span className="flex items-center gap-1 text-[10px] text-amber-400" title="Este método no devolvió anuncios en Binance — mostrando mercado general">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        Sin resultados · En vivo
+                      </span>
+                    )}
+                    {/* Sin fetch aún → mercado general */}
                     {!stratRate && !stratFetching && (
                       <span className="flex items-center gap-1 text-[10px] text-green-500">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
