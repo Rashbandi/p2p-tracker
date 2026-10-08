@@ -18,7 +18,31 @@ export default function DashboardPage() {
   const [cycles, setCycles]         = useState<P2PCycle[]>([])
   const [hideZero, setHideZero]     = useState(false)
   const [hideSaldos, setHideSaldos] = useState(false)
+// IMPORTA EL NUEVO COMPONENTE AL INICIO DE TU page.tsx
+import { SmartStrategies } from '@/components/dashboard/SmartStrategies'
 
+// ... dentro del return de tu DashboardPage, cambia la estructura del grid así:
+
+      {/* Main grid: Estrategias a la izquierda (ocupa 2 columnas), Donut a la derecha */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 mt-6">
+        <div className="lg:col-span-2">
+          <SmartStrategies />
+        </div>
+
+        <Card>
+           {/* Aquí mantienes tu DonutChart de Distribución actual */}
+          <CardHeader>
+             <CardTitle>Distribución</CardTitle>
+          </CardHeader>
+          <DonutChart data={chartData} />
+        </Card>
+      </div>
+
+      {/* Grid Secundario: El panel de tasas clásico y ciclos activos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <RatesPanel />
+        {/* Aquí va tu Card de "Ciclos activos" que ya tienes programada */}
+      </div>
   useEffect(() => {
     if (!user) return
     supabase
