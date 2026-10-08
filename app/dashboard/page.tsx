@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
+import { SmartStrategies } from '@/components/dashboard/SmartStrategies'
 import { RatesPanel } from '@/components/dashboard/RatesPanel'
 import { Calculator } from '@/components/dashboard/Calculator'
 import { DonutChart } from '@/components/dashboard/DonutChart'
@@ -18,31 +19,7 @@ export default function DashboardPage() {
   const [cycles, setCycles]         = useState<P2PCycle[]>([])
   const [hideZero, setHideZero]     = useState(false)
   const [hideSaldos, setHideSaldos] = useState(false)
-// IMPORTA EL NUEVO COMPONENTE AL INICIO DE TU page.tsx
-import { SmartStrategies } from '@/components/dashboard/SmartStrategies'
 
-// ... dentro del return de tu DashboardPage, cambia la estructura del grid así:
-
-      {/* Main grid: Estrategias a la izquierda (ocupa 2 columnas), Donut a la derecha */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 mt-6">
-        <div className="lg:col-span-2">
-          <SmartStrategies />
-        </div>
-
-        <Card>
-           {/* Aquí mantienes tu DonutChart de Distribución actual */}
-          <CardHeader>
-             <CardTitle>Distribución</CardTitle>
-          </CardHeader>
-          <DonutChart data={chartData} />
-        </Card>
-      </div>
-
-      {/* Grid Secundario: El panel de tasas clásico y ciclos activos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <RatesPanel />
-        {/* Aquí va tu Card de "Ciclos activos" que ya tienes programada */}
-      </div>
   useEffect(() => {
     if (!user) return
     supabase
@@ -146,11 +123,11 @@ import { SmartStrategies } from '@/components/dashboard/SmartStrategies'
         ))}
       </div>
 
-      {/* Main grid */}
+      {/* Main grid: Estrategias Inteligentes y Distribución */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        {/* Rates — takes 2 cols */}
+        {/* Smart Strategies — takes 2 cols */}
         <div className="lg:col-span-2">
-          <RatesPanel />
+          <SmartStrategies />
         </div>
 
         {/* Portfolio donut */}
@@ -174,52 +151,32 @@ import { SmartStrategies } from '@/components/dashboard/SmartStrategies'
         </Card>
       </div>
 
-      {/* Calculator + Active cycles */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Calculator />
+      {/* Grid Secundario: Panel de Tasas y Ciclos Activos */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {/* Rates Panel — takes 2 cols */}
+        <div className="lg:col-span-2">
+          <RatesPanel />
+        </div>
 
         {/* Active cycles */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Ciclos activos</CardTitle>
-            <Badge variant="green" dot>{activeCycles.length} activos</Badge>
-          </CardHeader>
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ciclos activos</CardTitle>
+              <Badge variant="green" dot>{activeCycles.length} activos</Badge>
+            </CardHeader>
 
-          {activeCycles.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-sm text-gray-600 mb-3">No hay ciclos activos</p>
-              <a
-                href="/cycles"
-                className="text-xs text-green-400 hover:text-green-300 font-medium"
-              >
-                Crear primer ciclo →
-              </a>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {activeCycles.map(cycle => (
-                <div key={cycle.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-xl">
-                  <div>
-                    <p className="text-sm font-medium text-white">{cycle.name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {cycle.exchange} · {cycle.fiat}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-mono font-semibold text-blue-400">
-                      {maskVal(fmtVES(cycle.capital_fiat))}
-                    </p>
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      {maskVal(fmtUSDT(cycle.capital_usdt))} USDT
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-    </div>
-    </RatesProvider>
-  )
-}
+            {activeCycles.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-sm text-gray-600 mb-3">No hay ciclos activos</p>
+                <a
+                  href="/cycles"
+                  className="text-xs text-green-400 hover:text-green-300 font-medium"
+                >
+                  Crear primer ciclo →
+                </a>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {activeCycles.map(cycle => (
+                  <div key={cycle
