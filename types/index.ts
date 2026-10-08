@@ -102,3 +102,34 @@ export interface Session {
   accessToken: string
   expiresAt: number
 }
+// Añadir al final de tu archivo types/index.ts
+
+export type TransferNetwork = 'TRC20' | 'BEP20' | 'ERC20' | 'Arbitrum'
+
+export interface PlatformFees {
+  exchange: Exchange
+  makerFeePct: number
+  takerFeePct: number
+  updatedAt: string // Para saber cuándo el bot revisó la página oficial por última vez
+}
+
+export interface ArbitrageStrategy {
+  id: string
+  fiat: Fiat
+  buyExchange: Exchange
+  sellExchange: Exchange
+  transferNetwork: TransferNetwork
+  networkFeeUsdt: number // Ej: 1 USDT (TRC20) o 0.19 USDT (BEP20)
+  suggestedCapital: number
+  buyRate: number
+  sellRate: number
+  estimatedTimeMins: number
+  grossProfitFiat: number
+  netProfitFiat: number
+  roiPct: number
+  // Para los profesionales:
+  dynamicFees: {
+    buyMaker: number
+    sellMaker: number
+  }
+}
